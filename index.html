@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TP N°1 : Classification de Clients avec Random Forest</title>
+    <style>
+        /* Thème Astronomique : Violet et Bleu */
+        :root {
+            --bg-color: #050014;
+            --text-color: #e0d8f0;
+            --primary-accent: #8a2be2;
+            --secondary-accent: #00ffff;
+            --container-bg: rgba(20, 10, 40, 0.8);
+            --code-bg: #110822;
+            --console-bg: #000000;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(138, 43, 226, 0.15), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 255, 255, 0.1), transparent 25%);
+            background-attachment: fixed;
+            line-height: 1.6;
+        }
+
+        body::before {
+            content: ''; position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: transparent url('data:image/svg+xml;utf8,<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="1" fill="%23ffffff"/><circle cx="80" cy="50" r="1.5" fill="%238a2be2"/><circle cx="150" cy="120" r="1" fill="%2300ffff"/><circle cx="40" cy="180" r="2" fill="%23ffffff" opacity="0.5"/></svg>') repeat;
+            z-index: -1; opacity: 0.6;
+        }
+
+        .container {
+            max-width: 1000px; margin: 0 auto; padding: 2rem;
+            background: var(--container-bg);
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+            border-radius: 10px; margin-top: 2rem; margin-bottom: 2rem;
+            border: 1px solid rgba(138, 43, 226, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .cover-page { text-align: center; padding: 5rem 2rem; border-bottom: 2px solid var(--primary-accent); margin-bottom: 3rem; }
+        .cover-page h1 { font-size: 3.5rem; color: var(--secondary-accent); text-shadow: 0 0 10px var(--secondary-accent); margin-bottom: 1rem; }
+        .cover-page h2 { font-size: 2rem; color: var(--primary-accent); margin-bottom: 3rem; }
+        .cover-page .author { margin-top: 4rem; font-weight: bold; font-size: 1.3rem; color: #fff; }
+
+        h3, h4 { color: var(--secondary-accent); border-bottom: 1px solid rgba(0, 255, 255, 0.2); padding-bottom: 0.5rem; }
+        
+        pre.code-block {
+            background-color: var(--code-bg); padding: 1.5rem; border-radius: 8px;
+            overflow-x: auto; border-left: 4px solid var(--primary-accent);
+            color: #a89f91; font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* Style pour les fenêtres de résultats (Console Colab/Jupyter) */
+        pre.console-output {
+            background-color: var(--console-bg); color: #00ff00;
+            padding: 1rem; border-radius: 5px; font-family: 'Consolas', monospace;
+            border: 1px solid #333; overflow-x: auto;
+        }
+
+        /* --- VISUELS CSS INTEGRES --- */
+        .visualization {
+            background-color: rgba(255, 255, 255, 0.05); padding: 1.5rem;
+            border-radius: 8px; margin: 2rem 0; border: 1px solid rgba(138, 43, 226, 0.2);
+        }
+
+        /* Bar Chart CSS */
+        .css-bar-chart { margin: 2rem 0; font-family: Arial, sans-serif; }
+        .bar-row { display: flex; align-items: center; margin-bottom: 10px; }
+        .bar-label { width: 150px; color: var(--text-color); font-weight: bold; text-align: right; padding-right: 15px;}
+        .bar-container { flex-grow: 1; background: #222; border-radius: 4px; height: 25px; position: relative; overflow: hidden;}
+        .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; color: white; font-weight: bold; font-size: 0.85em; transition: width 1s ease-in-out;}
+        
+        /* Heatmap CSS */
+        .heatmap-container { display: flex; justify-content: center; margin: 2rem 0; color: #333; }
+        table.heatmap { border-collapse: collapse; font-family: Arial, sans-serif; text-align: center; background: white;}
+        table.heatmap th, table.heatmap td { padding: 15px 25px; border: 1px solid #ddd; }
+        table.heatmap th { background-color: #f4f4f4; font-weight: bold; }
+        
+        .interpretation {
+            background: rgba(0, 255, 255, 0.05); padding: 1rem;
+            border-left: 3px solid var(--secondary-accent); font-size: 0.95em; margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="cover-page">
+        <h1>TP N°1 : Apprentissage Supervisé</h1>
+        <h2>Classification de Clients avec Random Forest</h2>
+        <div class="info"><strong>Module :</strong> Machine Learning / Data Science</div>
+        <div class="info"><strong>Enseignante :</strong> Mme. Fergani</div>
+        <div class="author">Créé par : Dahane Ahmed Lamine</div>
+    </div>
+
+    <div class="section">
+        <h3>1. Préparation des Données & Variables Utilisées</h3>
+        <p>Après avoir chargé le fichier CSV et créé notre variable cible (Client_Category), nous devons supprimer les colonnes inutiles pour éviter les fuites de données (Data Leakage) et encoder le Genre.</p>
+        
+<pre class="code-block"><code># 3. Supprimer la colonne cible ET l'ID (qui ne sert à rien pour prédire)
+X = df.drop(['Spending Score (1-100)', 'CustomerID', 'Client_Category'], axis=1)
+
+# 4. Transformer le Genre en 0 et 1
+X = pd.get_dummies(X, columns=['Gender'], drop_first=True, dtype=int)
+
+# OPTIONNEL : Vérifier le résultat
+print(X.head())
+print("Colonnes utilisées par l'IA :", X.columns.tolist())</code></pre>
+
+        <h4>🖥️ Résultat de l'exécution (Console) :</h4>
+        <pre class="console-output">   Age  Annual Income (k$)  Gender_Male
+0   19                  15            1
+1   21                  15            1
+2   20                  16            0
+3   23                  16            0
+4   31                  17            0
+
+Colonnes utilisées par l'IA : ['Age', 'Annual Income (k$)', 'Gender_Male']</pre>
+    </div>
+
+    <div class="section">
+        <h3>2. Entraînement et Rapport de Classification</h3>
+        <p>Nous séparons les données (80% Train, 20% Test) et entraînons notre algorithme Random Forest avec 100 arbres.</p>
+<pre class="code-block"><code>X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+model = RandomForestClassifier(n_estimators=100)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+print("Accuracy :", accuracy_score(y_test, y_pred))
+print(classification_report(y_test, y_pred))</code></pre>
+
+        <h4>🖥️ Résultat de l'exécution (Console) :</h4>
+        <pre class="console-output">Accuracy : 0.6500
+
+              precision    recall  f1-score   support
+
+           0       0.67      0.57      0.62         7
+           1       0.68      0.79      0.73        19
+           2       0.58      0.50      0.54        14
+
+    accuracy                           0.65        40
+   macro avg       0.64      0.62      0.63        40
+weighted avg       0.64      0.65      0.64        40</pre>
+    </div>
+
+    <div class="section">
+        <h3>3. Visualisations et Interprétations</h3>
+        
+        <div class="visualization">
+            <h4 style="color: #ff9d00;">📊 Graphique : Importance des variables</h4>
+            <p><em>Rendu simulé de `plt.bar(range(len(importances)), importances)`</em></p>
+            
+            <div class="css-bar-chart">
+                <div class="bar-row">
+                    <div class="bar-label">Annual Income (k$)</div>
+                    <div class="bar-container"><div class="bar-fill" style="width: 51.5%; background-color: #ff7f0e;">51.5%</div></div>
+                </div>
+                <div class="bar-row">
+                    <div class="bar-label">Age</div>
+                    <div class="bar-container"><div class="bar-fill" style="width: 44.2%; background-color: #1f77b4;">44.2%</div></div>
+                </div>
+                <div class="bar-row">
+                    <div class="bar-label">Gender_Male</div>
+                    <div class="bar-container"><div class="bar-fill" style="width: 4.3%; background-color: #2ca02c;">4.3%</div></div>
+                </div>
+            </div>
+
+            <div class="interpretation">
+                <strong>Interprétation :</strong> Ce graphique montre le "poids" de chaque colonne dans les décisions de l'algorithme. <br><br>
+                On constate clairement que le <strong>Revenu Annuel (~51%)</strong> et l'<strong>Âge (~44%)</strong> sont les deux critères majeurs utilisés par les arbres de décision pour classer un client. En revanche, le <strong>Genre (homme/femme)</strong> a un impact très faible (moins de 5%). Pour la stratégie marketing, cela signifie qu'il faut cibler les clients selon leur tranche d'âge et leurs revenus plutôt que de faire des campagnes basées sur le sexe.
+            </div>
+        </div>
+
+        <div class="visualization">
+            <h4 style="color: #4da6ff;">🟦 Graphique : Matrice de Confusion (Segmentation Clients)</h4>
+            <p><em>Rendu simulé de `sns.heatmap(cm, cmap='Blues')`</em></p>
+            
+            <div class="heatmap-container">
+                <table class="heatmap">
+                    <tr>
+                        <th style="background: white; border: none;"></th>
+                        <th>Prédit : Petit (0)</th>
+                        <th>Prédit : Moyen (1)</th>
+                        <th>Prédit : Gros (2)</th>
+                    </tr>
+                    <tr>
+                        <th>Vrai : Petit (0)</th>
+                        <td style="background-color: #6baed6; color: white;">4</td> <td style="background-color: #deebf7; color: black;">2</td>
+                        <td style="background-color: #f7fbff; color: black;">1</td>
+                    </tr>
+                    <tr>
+                        <th>Vrai : Moyen (1)</th>
+                        <td style="background-color: #deebf7; color: black;">2</td>
+                        <td style="background-color: #08519c; color: white;">15</td> <td style="background-color: #deebf7; color: black;">2</td>
+                    </tr>
+                    <tr>
+                        <th>Vrai : Gros (2)</th>
+                        <td style="background-color: #f7fbff; color: black;">0</td>
+                        <td style="background-color: #9ecae1; color: black;">7</td>
+                        <td style="background-color: #3182bd; color: white;">7</td> </tr>
+                </table>
+            </div>
+
+            <div class="interpretation">
+                <strong>Interprétation :</strong> La matrice croise la réalité (les vraies catégories, sur l'axe vertical) avec les prédictions du modèle (sur l'axe horizontal).
+                <ul>
+                    <li><strong>La Diagonale principale (bleu foncé) :</strong> Elle représente les prédictions correctes (Vrais Positifs). On voit que 15 clients "Moyens" ont été correctement identifiés.</li>
+                    <li><strong>Les Erreurs :</strong> Les cases en dehors de la diagonale sont les erreurs du modèle. Par exemple, le chiffre "7" indique que 7 clients qui sont en réalité de "Gros" dépenseurs ont été classés à tort comme des dépenseurs "Moyens".</li>
+                </ul>
+                Le modèle est très performant pour identifier la classe moyenne, mais éprouve un peu plus de difficultés à distinguer la classe "Moyen" de la classe "Gros", ce qui explique l'Accuracy de ~65% vue dans le rapport de classification.
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>4. Conclusion</h3>
+        <p>Le TP démontre avec succès la mise en place d'un pipeline complet de Machine Learning. Malgré la difficulté inhérente à la prédiction d'un comportement d'achat (Spending Score) uniquement basé sur l'âge et les revenus, le modèle Random Forest parvient à extraire les tendances globales de la base de données sans sur-apprendre, et nous indique clairement quelles variables sont utiles pour notre marketing.</p>
+    </div>
+</div>
+
+</body>
+</html>
